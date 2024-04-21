@@ -1,0 +1,3 @@
+#!/bin/bash
+export MASTER=/dev/ttyACM1
+export SLAVE=/dev/ttyACM0
