@@ -9,11 +9,11 @@ import struct
 if __name__ == '__main__':
     port = sys.argv[1]
     file = sys.argv[2]
-    baud = 115200
+    baud = 921600
     s = Serial(port, baudrate=baud)
     s.flush()
 
-    chunksize = 1000
+    chunksize = 100
     delay = 0.01
     print(f'Sending file {file}, chunksize: {chunksize}, delay: {delay}')
     sent = 0

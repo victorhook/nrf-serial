@@ -19,28 +19,20 @@ SETTINGS_START_ADDRESS = 0x101ff000
 
 @dataclass
 class Settings:
-    tx_address: bytes    # uint8_t[5]
-    rx_address1: bytes   # uint8_t[5]
-    rx_address2: bytes   # uint8_t[5]
-    rx_address3: bytes   # uint8_t[5]
-    rx_address4: bytes   # uint8_t[5]
-    rx_address5: bytes   # uint8_t[5]
-    radio_pa_level: int  # uint8_t
-    radio_channel: int   # uint8_t
-    radio_datarate: int  # uint8_t
-    serial_baudrate: int # uint32_t
+    radio_address:          bytes # uint8_t[5]
+    radio_pa_level:         int   # uint8_t
+    radio_channel:          int   # uint8_t
+    radio_datarate:         int   # uint8_t
+    serial_baudrate:        int   # uint32_t
+    serial_tunnel_port_usb: int   # uint32_t
 
     _FMT = '<' + ''.join([
-        '5s',
-        '5s',
-        '5s',
-        '5s',
-        '5s',
         '5s',
         'B',
         'B',
         'B',
         'I',
+        'B'
     ])
 
     def to_bytes(self) -> bytes:
@@ -77,7 +69,7 @@ class Device:
             settings = Settings.from_bytes(f.read())
 
         # Clean up the temp file once we're done
-        #os.remove(self._tmp_file)
+        os.remove(self._tmp_file)
 
         return settings
 
@@ -168,16 +160,12 @@ class Gui(tk.Tk):
         col = 0
         default_addr = '00 00 00 00 00'
 
-        self.tx_address = self.Parameter(self.frame_settings, 'TX Address', default_addr, row + 0, col, 'Space separated hex (5)')
-        self.rx_address1 = self.Parameter(self.frame_settings, 'RX Address 1', default_addr, row + 1, col, 'Space separated hex (5)')
-        self.rx_address2 = self.Parameter(self.frame_settings, 'RX Address 2', default_addr, row + 2, col, 'Space separated hex (5)')
-        self.rx_address3 = self.Parameter(self.frame_settings, 'RX Address 3', default_addr, row + 3, col, 'Space separated hex (5)')
-        self.rx_address4 = self.Parameter(self.frame_settings, 'RX Address 4', default_addr, row + 4, col, 'Space separated hex (5)')
-        self.rx_address5 = self.Parameter(self.frame_settings, 'RX Address 5', default_addr, row + 5, col, 'Space separated hex (5)')
-        self.radio_pa_level = self.Parameter(self.frame_settings, 'PA Level', '0', row + 6, col, '0=MIN, 1=LOW, 2=HIGH, 3=MAX')
-        self.radio_channel = self.Parameter(self.frame_settings, 'Channel', '0', row + 7, col, '0-125')
-        self.radio_datarate = self.Parameter(self.frame_settings, 'Datarate', '0', row + 8, col, '0=1MBps, 1=2MBps, 2=250kbps')
-        self.serial_baudrate = self.Parameter(self.frame_settings, 'Serial baudrate', '115200', row + 9, col, 'Baud rate to use for serial')
+        self.radio_address = self.Parameter(self.frame_settings, 'TX Address', default_addr, row + 0, col, 'Space separated hex (5)')
+        self.radio_pa_level = self.Parameter(self.frame_settings, 'PA Level', '0', row + 1, col, '0=MIN, 1=LOW, 2=HIGH, 3=MAX')
+        self.radio_channel = self.Parameter(self.frame_settings, 'Channel', '0', row + 2, col, '0-125')
+        self.radio_datarate = self.Parameter(self.frame_settings, 'Datarate', '0', row + 3, col, '0=1MBps, 1=2MBps, 2=250kbps')
+        self.serial_baudrate = self.Parameter(self.frame_settings, 'Serial baudrate', '115200', row + 4, col, 'Baud rate to use for serial')
+        self.serial_tunnel_port_usb = self.Parameter(self.frame_settings, 'Serial tunnel USB', '115200', row + 5, col, '0=Tunnel is through UART, 1=Tunnel is through USB')
 
         # -- Control frame -- #
         self.console = tk.Text(self.frame_control, height=10, width=80)
@@ -235,34 +223,26 @@ class Gui(tk.Tk):
         def _addr(raw: bytes) -> str:
             return ' '.join(hex(b)[2:] for b in raw)
 
-        self.tx_address.var.set(_addr(settings.tx_address))
-        self.rx_address1.var.set(_addr(settings.rx_address1))
-        self.rx_address2.var.set(_addr(settings.rx_address2))
-        self.rx_address3.var.set(_addr(settings.rx_address3))
-        self.rx_address4.var.set(_addr(settings.rx_address4))
-        self.rx_address5.var.set(_addr(settings.rx_address5))
+        self.radio_address.var.set(_addr(settings.radio_address))
         self.radio_pa_level.var.set(str(settings.radio_pa_level))
         self.radio_channel.var.set(str(settings.radio_channel))
         self.radio_datarate.var.set(str(settings.radio_datarate))
         self.serial_baudrate.var.set(str(settings.serial_baudrate))
+        self.serial_tunnel_port_usb.var.set(str(settings.serial_tunnel_port_usb))
 
     def _write(self) -> None:
         def _addr(raw: str) -> bytes:
             return bytes(int(hexstr, 16) for hexstr in raw.split(' '))
 
         settings = Settings(
-            _addr(self.tx_address.var.get()),
-            _addr(self.rx_address1.var.get()),
-            _addr(self.rx_address2.var.get()),
-            _addr(self.rx_address3.var.get()),
-            _addr(self.rx_address4.var.get()),
-            _addr(self.rx_address5.var.get()),
+            _addr(self.radio_address.var.get()),
             int(self.radio_pa_level.var.get()),
             int(self.radio_channel.var.get()),
             int(self.radio_datarate.var.get()),
-            int(self.serial_baudrate.var.get())
+            int(self.serial_baudrate.var.get()),
+            int(self.serial_tunnel_port_usb.var.get()),
         )
-        
+
         print('Writing settings:')
         print(settings)
 
@@ -287,7 +267,11 @@ class Gui(tk.Tk):
                 if ports != self.serial_ports:
                     self.serial_ports = ports
                     self.port_dropdown.config(values=self.serial_ports)
-                    self.port_dropdown.current(0)
+                    try:
+                        self.port_dropdown.current(0)
+                    except Exception as e:
+                        # This can happen if there's 0 ports
+                        pass
             time.sleep(1)
 
 if __name__ == '__main__':
